@@ -1,5 +1,11 @@
 import Dependencies._
 
+fork in run := true
+
+javaOptions += "-Xms4g"
+
+javaOptions += "-Xmx4g"
+
 name := "common-core"
 
 libraryDependencies ++= Seq(

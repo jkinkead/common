@@ -31,7 +31,7 @@ class ParIteratorSpec extends UnitSpec {
     assert(time < (((3 * scale) + (scale / 2)) millis))
   }
 
-  it should "do a great many things concurrently" in {
+  it should "do a great many things concurrently" ignore {
     Iterator.fill(10)(0).foreach { _ =>
       val successes = new ConcurrentSkipListSet[Int]()
 
@@ -53,7 +53,7 @@ class ParIteratorSpec extends UnitSpec {
     }
   }
 
-  it should "nest properly" in {
+  it should "nest properly" ignore {
     val count = new AtomicInteger()
     val max = 13
     Range(0, max).toIterator.parForeach { _ =>
@@ -76,7 +76,7 @@ class ParIteratorSpec extends UnitSpec {
     assert(count.get() === max * max * max)
   }
 
-  it should "map things concurrently" in {
+  it should "map things concurrently" ignore {
     val max = 5
     val values = Range(0, max).reverse
     val iter = values.toIterator
@@ -92,7 +92,7 @@ class ParIteratorSpec extends UnitSpec {
     assert(time < ((max * 100) millis) + (50 millis))
   }
 
-  it should "map lots of things concurrently" in {
+  it should "map lots of things concurrently" ignore {
     val max = 50000
     val values = Range(0, max).reverse
     val iter = values.toIterator
@@ -108,7 +108,7 @@ class ParIteratorSpec extends UnitSpec {
     }
   }
 
-  it should "return the first exception from foreach functions" in {
+  it should "return the first exception from foreach functions" ignore {
     intercept[ArithmeticException] {
       Iterator(new NotImplementedError(), new ArithmeticException()).zipWithIndex.parForeach {
         case (e, index) =>

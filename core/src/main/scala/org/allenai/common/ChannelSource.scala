@@ -43,7 +43,7 @@ class ChannelSource(
   private[common] var inputRemaining = true
 
   /** The position we are at in the fil. Only used if memoryMap is true. */
-  private[common] var totalOffset = 0l
+  private[common] var totalOffset = 0L
 
   /** The buffer to read input into and out of. Initialized to empty. */
   private[common] var inBuffer = if (memoryMap) {
@@ -78,7 +78,7 @@ class ChannelSource(
     if (memoryMap) {
       // Truncate the offset to the size of the file.
       totalOffset = if (newPosition > inFile.size) { inFile.size } else { newPosition }
-      val size: Long = Math.min(inFile.size - totalOffset, ChannelSource.OneGigabyte)
+      val size: Long = Math.min(inFile.size - totalOffset, ChannelSource.MaxMapSize)
       inBuffer = inFile.map(FileChannel.MapMode.READ_ONLY, totalOffset, size)
     } else {
       inFile.position(newPosition)
@@ -159,7 +159,7 @@ class ChannelSource(
   protected[common] def fillBuffer(): Boolean = {
     if (memoryMap) {
       val currOffset = totalOffset + inBuffer.position
-      val size: Long = Math.min(inFile.size - currOffset, ChannelSource.OneGigabyte)
+      val size: Long = Math.min(inFile.size - currOffset, ChannelSource.MaxMapSize)
       // Only remap if we have any more data to add.
       if (size > inBuffer.remaining) {
         totalOffset = currOffset
@@ -175,7 +175,97 @@ class ChannelSource(
       inBuffer.hasRemaining
     }
   }
+
+  /** Iterator class for reading the file linewise. */
+  private[common] class LineIterator extends Iterator[String] {
+    val newline = '\n'.toByte
+    val charset = codec.charSet
+    override def hasNext: Boolean = ChannelSource.this.hasNext
+    var bufferSize = 1024
+    var lineBuffer: Array[Byte] = new Array(bufferSize)
+    var lineLength = 0
+
+    override def next(): String = {
+      if (!ChannelSource.this.hasNext) {
+        throw new NoSuchElementException("next() called with no lines remaining")
+      }
+      lineLength = 0
+      var b = inBuffer.get()
+      // Read chars until we find a newline.
+      while (b != newline && ChannelSource.this.hasNext) {
+        if (bufferSize == lineLength) {
+          bufferSize = bufferSize * 2
+          val newBuffer = new Array[Byte](bufferSize)
+          System.arraycopy(lineBuffer, 0, newBuffer, 0, lineBuffer.length)
+          lineBuffer = newBuffer
+        }
+        lineBuffer(lineLength) = b
+        lineLength += 1
+        b = inBuffer.get()
+      }
+      // Append final char if we reached the end-of-file.
+      if (b != '\n') {
+        if (bufferSize == lineLength) {
+          bufferSize = bufferSize * 2
+          val newBuffer = new Array[Byte](bufferSize)
+          System.arraycopy(lineBuffer, 0, newBuffer, 0, lineBuffer.length)
+          lineBuffer = newBuffer
+        }
+        lineBuffer(lineLength) = b
+        lineLength += 1
+      }
+      new String(lineBuffer, 0, lineLength, charset)
+    }
+  }
+
+  /** Returns an iterator over the remaining lines in this ChannelSource. Note that any reads done
+    * on this iterator will be reflected in the main ChannelSource!
+    */
+  def getLines(): Iterator[String] = new LineIterator
 }
 object ChannelSource {
-  val OneGigabyte: Long = 1L << 30
+  val MaxMapSize: Long = (1L << 31) - 1
+  def main(args: Array[String]): Unit = {
+    println("Timing Source and ChannelSource.")
+    val wikip = "/Users/Kinkead/data/wikipedia/Wikipedia-all.txt-v1"
+
+    def timeMappedChannelSource(): Unit = {
+      val startTime = System.currentTimeMillis
+      val inFile = FileChannel.open(java.nio.file.Paths.get(wikip))
+      val channelSource = new ChannelSource(inFile, memoryMap = true)
+      //val charCount = channelSource count { _ => true }
+      //println(s"MappedChannelSource charCount = $charCount")
+      val lineCount = channelSource count { _ == '\n' }
+      println(s"MappedChannelSource lineCount = $lineCount")
+      println(s"MappedChannelSource took ${System.currentTimeMillis - startTime} millis.")
+      inFile.close()
+    }
+
+    def timeChannelSource(): Unit = {
+      val startTime = System.currentTimeMillis
+      val inFile = FileChannel.open(java.nio.file.Paths.get(wikip))
+      val channelSource = new ChannelSource(inFile, bufferSize = 1 << 30)
+      //val charCount = channelSource count { _ => true }
+      //println(s"ChannelSource charCount = $charCount")
+      //val count = channelSource count { _ == '\n' }
+      val count = channelSource.getLines().size
+      println(s"ChannelSource count = $count")
+      println(s"ChannelSource took ${System.currentTimeMillis - startTime} millis.")
+      inFile.close()
+    }
+
+    def timeSource(): Unit = {
+      val startTime = System.currentTimeMillis
+      val scalaSource = scala.io.Source.fromFile(wikip)
+      //val count = scalaSource count { _ == '\n' }
+      val count = scalaSource.getLines().size
+      println(s"Scala count = $count")
+      println(s"Scala took ${System.currentTimeMillis - startTime} millis.")
+      scalaSource.close
+    }
+
+    timeChannelSource()
+    //timeSource()
+    //timeMappedChannelSource()
+  }
 }

@@ -127,4 +127,13 @@ class ChannelSourceSpec extends UnitSpec {
     source.position(0)
     withClue("After reading and resetting: ") { source.mkString("") should be("füü") }
   }
+
+  it should "read lines from a file" in {
+    val newlines = newFileWithBytes(Array('a', '\n', 'b') map { _.toByte })
+    val source = new ChannelSource(newlines)
+    val lines = source.getLines()
+    withClue("The first line: ") { lines.next() should be("a") }
+    withClue("After reading the first line: ") { source.position should be(2) }
+    withClue("The second line: ") { lines.next() should be("b") }
+  }
 }
