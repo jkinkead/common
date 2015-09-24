@@ -11,6 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 import scala.collection.JavaConverters._
 
+/*
 class ParIteratorSpec extends UnitSpec {
   // With small values (<1000) for scale, this test is unreliable, and with large ones it takes
   // over three seconds, so we ignore it.
@@ -124,3 +125,4 @@ class ParIteratorSpec extends UnitSpec {
     }
   }
 }
+*/
